@@ -3,6 +3,8 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'home_screen.dart';
 import 'transfer_screen.dart';
+import 'pay_bills_screen.dart';
+import 'cards_screen.dart';
 
 void main() {
   runApp(const BankingApp());
@@ -37,6 +39,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
     _pages = [
       HomeScreen(onFeatureTap: _onItemTapped),
       TransferPage(),
+      BillsPaymentPage(),
+      CardDetailsPage(),
     ];
   }
   void _onItemTapped(int index) {
