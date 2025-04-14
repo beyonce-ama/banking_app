@@ -1,4 +1,4 @@
-package com.example.banking_app
+package com.devopsfinals.banking_app
 
 import io.flutter.embedding.android.FlutterActivity
 
