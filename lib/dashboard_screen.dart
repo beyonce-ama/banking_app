@@ -1,10 +1,11 @@
-import 'package:bankapp/login_screen.dart';
+import 'login_screen.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'home_screen.dart';
 import 'transfer_screen.dart';
 import 'pay_bills_screen.dart';
 import 'cards_screen.dart';
+import 'settings_screen.dart';
 
 void main() {
   runApp(const BankingApp());
@@ -41,6 +42,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       TransferPage(),
       BillsPaymentPage(),
       CardDetailsPage(),
+       SettingsPage(),
     ];
   }
   void _onItemTapped(int index) {
