@@ -2,6 +2,7 @@ import 'package:bankapp/login_screen.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'home_screen.dart';
+import 'transfer_screen.dart';
 
 void main() {
   runApp(const BankingApp());
@@ -35,6 +36,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     super.initState();
     _pages = [
       HomeScreen(onFeatureTap: _onItemTapped),
+      TransferPage(),
     ];
   }
   void _onItemTapped(int index) {
