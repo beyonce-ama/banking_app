@@ -165,9 +165,66 @@ class ChangePinPage extends StatefulWidget {
 }
 
 class _ChangePinPageState extends State<ChangePinPage> {
-  final bool _isLoading = false;
+  bool _isLoading = false;
   String? _message;
-  final bool _isSuccess = false;
+  bool _isSuccess = false;
+
+void _showMessage(String message, {bool success = false}) {
+  setState(() {
+    _message = message;
+    _isSuccess = success;
+  });
+
+  Future.delayed(const Duration(seconds: 3), () {
+    setState(() => _message = null);
+  });
+}
+
+ Future<void> initiatePinChange() async {
+  final accountId = widget.user.id;
+
+  print('Initiating PIN change for accountId: $accountId');
+
+  setState(() {
+    _isLoading = true;
+  });
+
+  try {
+    final response = await http.post(
+      Uri.parse('https://phpconfig.fun/atmapp/send_otp.php'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'accountId': accountId}),
+    );
+
+    setState(() {
+      _isLoading = false;
+    });
+
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      print('Parsed response data: $data');
+
+      if (data['success'] != null) {
+        Navigator.push(
+          context,
+          CupertinoPageRoute(
+            builder: (context) => VerifyOtpPage(accountId: accountId.toString()),
+          ),
+        );
+      } else {
+        _showMessage(data['error'] ?? 'Failed to send OTP.');
+      }
+    } else {
+      _showMessage('Server error. Please try again later.');
+    }
+  } catch (e) {
+    print('Error occurred: $e');
+    setState(() {
+      _isLoading = false;
+    });
+    _showMessage('Something went wrong. Please check your connection.');
+  }
+}
 
  @override
 Widget build(BuildContext context) {
@@ -261,7 +318,7 @@ Widget build(BuildContext context) {
                     ),
                     const SizedBox(height: 30),
                     CupertinoButton(
-                    onPressed: () {  },
+                      onPressed: _isLoading ? null : initiatePinChange,
                     child: _isLoading
                       ? Container(
                           padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 20),
@@ -312,11 +369,80 @@ class VerifyOtpPage extends StatefulWidget {
 class _VerifyOtpPageState extends State<VerifyOtpPage> {
   final TextEditingController _otpController = TextEditingController();
   final TextEditingController _newPinController = TextEditingController();
-  final bool _isLoading = false;
+  bool _isLoading = false;
   String? _message;
-  final bool _isSuccess = false;
+  bool _isSuccess = false;
 bool _obscurePin = true;
 
+
+void _showMessage(String message, {bool success = false}) {
+  setState(() {
+    _message = message;
+    _isSuccess = success;
+  });
+
+  Future.delayed(const Duration(seconds: 3), () {
+    setState(() => _message = null);
+  });
+}
+
+ Future<void> verifyOtpAndChangePin() async {
+  final otp = _otpController.text.trim();
+  final newPin = _newPinController.text.trim();
+
+  if (otp.isEmpty || newPin.isEmpty) {
+    _showMessage('Please enter both OTP and new PIN.');
+    return;
+  }
+
+  setState(() {
+    _isLoading = true;
+  });
+
+  try {
+    final response = await http.post(
+      Uri.parse('https://phpconfig.fun/atmapp/change_pin.php'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'accountId': widget.accountId,
+        'otp': otp,
+        'newPin': newPin,
+      }),
+    );
+
+    setState(() {
+      _isLoading = false;
+    });
+
+    print('Response status: ${response.statusCode}');
+    print('Response body: ${response.body}');
+
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      if (data['success'] != null) {
+        _showMessage('PIN changed successfully!', success: true);
+        Future.delayed(const Duration(seconds: 2), () {
+        Navigator.of(context).pushAndRemoveUntil(
+          CupertinoPageRoute(builder: (_) => LoginScreen()),
+          (route) => false,
+        );
+      });
+      } else {
+        _showMessage(data['error'] ?? 'Failed to change PIN.');
+      }
+    } else {
+      _showMessage('Server error. Please try again later.');
+    }
+  } catch (error) {
+    setState(() {
+      _isLoading = false;
+    });
+    print('Error occurred: $error');
+    _showMessage('An error occurred. Please try again.');
+  }
+}
+
+  
 @override
 Widget build(BuildContext context) {
   return CupertinoPageScaffold(

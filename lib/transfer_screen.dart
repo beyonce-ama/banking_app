@@ -1,6 +1,9 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 import 'user_model.dart';
+import 'transfer_receipt.dart';
 import 'package:hive/hive.dart';
 
 
@@ -10,6 +13,10 @@ class TransferPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final Box savedAccountsBox = Hive.box('savedAccounts');
+    final List<Map<String, String>> savedAccounts = savedAccountsBox.values.cast<Map>().map((e) => Map<String, String>.from(e)).toList();
+
+
     final List<String> partnerBanks = ["BDO", "Landbank", "PNB", "China Bank", "Union Bank", "BPI", "RCBC",];
 
     return CupertinoPageScaffold(
@@ -56,6 +63,63 @@ class TransferPage extends StatelessWidget {
                   ),
                   const SizedBox(height: 10),
 
+                  // Horizontal scrollable saved accounts
+                  SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: savedAccounts.map((acc) {
+                        return GestureDetector(
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              CupertinoPageRoute(
+                                builder: (context) => TransferFormPage(
+                                  bankOrAccount: acc['bank']!,
+                                  accountId: user.id.toString(),
+                                  initialName: acc['name']!,
+                                  initialAccount: acc['account']!,
+                                  user: user,
+                                ),
+                              ),
+                            );
+                          },
+                          child: Container(
+                            width: 180,
+                            margin: const EdgeInsets.only(right: 12),
+                            padding: const EdgeInsets.all(14),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(16),
+                              boxShadow: const [
+                                BoxShadow(
+                                  color: Colors.black12,
+                                  blurRadius: 8,
+                                  offset: Offset(0, 3),
+                                ),
+                              ],
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  acc['name']!,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 16,
+                                  ),
+                                ),
+                                const SizedBox(height: 6),
+                                Text("${acc['bank']} • ${acc['account']}",
+                                    style: const TextStyle(
+                                        color: Colors.grey, fontSize: 14)),
+                              ],
+                            ),
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                  ),
+
                   const SizedBox(height: 30),
                   const Text(
                     'Partner Banks',
@@ -68,7 +132,18 @@ class TransferPage extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: partnerBanks.map((bank) {
                       return GestureDetector(
-                        onTap: () {},
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            CupertinoPageRoute(
+                              builder: (context) => TransferFormPage(
+                                bankOrAccount: bank,
+                                accountId: user.id.toString(),
+                                user: user,
+                              ),
+                            ),
+                          );
+                        },
                         child: Container(
                           padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
                           margin: const EdgeInsets.only(bottom: 10),
@@ -144,7 +219,107 @@ class TransferFormPageState extends State<TransferFormPage> {
   final TextEditingController _amountController = TextEditingController();
 
   String? _message;
-  final bool _isSuccess = false;
+  bool _isSuccess = false;
+
+  final String _transferApiUrl = "https://phpconfig.fun/atmapp/transfer.php";
+
+  Future<void> _submitTransfer() async {
+    final name = _recipientNameController.text.trim();
+    final account = _accountNumberController.text.trim();
+    final amount = _amountController.text.trim();
+    final bank = widget.bankOrAccount;
+    final accountId = widget.accountId;
+
+    if (name.isEmpty || account.isEmpty || amount.isEmpty) {
+      _showMessage("Please fill out all fields.");
+      return;
+    }
+
+    try {
+      final response = await http.post(
+        Uri.parse(_transferApiUrl),
+        body: {
+          "accountId": accountId,
+          "recipientBankName": bank,
+          "recipientAccountNumber": account,
+          "amount": amount,
+        },
+      );
+
+      final json = jsonDecode(response.body);
+      if (json.containsKey('success')) {
+        _showMessage(json['success'], success: true);
+        Future.delayed(const Duration(seconds: 1), () {
+          Navigator.push(
+            context,
+            CupertinoPageRoute(
+              builder: (_) => TransferReceiptPage(
+                recipientName: name,
+                bank: bank,
+                accountNumber: account,
+                amount: amount, user: widget.user,
+      
+              ),
+            ),
+          );
+        });
+      }  else if (json.containsKey('error')) {
+      _showMessage(json['error']); 
+    } else {
+      _showMessage('Transfer failed.');  
+    }
+    } catch (e) {
+
+
+      _showMessage("Failed to connect to server.");
+    }
+  }
+
+  void _showMessage(String message, {bool success = false}) {
+    setState(() {
+      _message = message;
+      _isSuccess = success;
+    });
+
+    Future.delayed(const Duration(seconds: 3), () {
+      setState(() => _message = null);
+    });
+  }
+
+Future<void> _saveAccountToHive() async {
+  final name = _recipientNameController.text.trim();
+  final bank = widget.bankOrAccount;
+  final account = _accountNumberController.text.trim();
+
+  if (name.isEmpty || account.isEmpty) {
+    _showMessage("Please fill out recipient name and account number.");
+    return;
+  }
+
+  final box = await Hive.openBox('savedAccounts');
+  
+  // Check if the account already exists
+  bool accountExists = false;
+  for (var savedAccount in box.values) {
+    if (savedAccount['account'] == account && savedAccount['bank'] == bank) {
+      accountExists = true;
+      break;
+    }
+  }
+
+  if (accountExists) {
+    _showMessage("This account is already saved.");
+    return;
+  }
+
+  await box.add({
+    'name': name,
+    'bank': bank,
+    'account': account,
+  });
+
+  _showMessage("Account saved successfully!", success: true);
+}
 
 @override
 void initState() {
@@ -267,6 +442,7 @@ void initState() {
                 Align(
                   alignment: Alignment.centerRight,
                   child: GestureDetector(
+                    onTap: _saveAccountToHive,
                     child: Container(
                       padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 14),
                       decoration: BoxDecoration(
@@ -310,6 +486,7 @@ void initState() {
 
                 // Submit Button
                GestureDetector(
+                onTap: _submitTransfer,
                 child: Container(
                   width: double.infinity,
                   padding: const EdgeInsets.symmetric(vertical: 16),

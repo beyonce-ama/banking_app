@@ -1,9 +1,14 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
+import 'user_model.dart';
 import 'dashboard_screen.dart';
 
 class BillsPaymentPage extends StatelessWidget {
-  const BillsPaymentPage({super.key, });
+  const BillsPaymentPage({super.key, required this.user});
+
+  final User user;
 
   @override
   Widget build(BuildContext context) {
@@ -97,7 +102,7 @@ class BillsPaymentPage extends StatelessWidget {
               context,
               CupertinoPageRoute(
                 builder: (context) =>
-                    BillPaymentFormPage(biller: biller['name']),
+                    BillPaymentFormPage(biller: biller['name'], user: user),
               ),
             );
           },
@@ -149,10 +154,12 @@ class BillsPaymentPage extends StatelessWidget {
 
 class BillPaymentFormPage extends StatefulWidget {
   final String biller;
+  final User user;
 
   const BillPaymentFormPage({
     super.key,
     required this.biller,
+    required this.user,
   });
 
   @override
@@ -160,11 +167,75 @@ class BillPaymentFormPage extends StatefulWidget {
 }
 
 class _BillPaymentFormPageState extends State<BillPaymentFormPage> {
-  final _amountController = TextEditingController();
+  final TextEditingController _amountController = TextEditingController();
   final TextEditingController _accountNumberController = TextEditingController();
-  final bool _isLoading = false;
-  String? _message;
-  final bool _isSuccess = false;
+  bool _isLoading = false;
+String? _message;
+bool _isSuccess = false;
+
+  Future<void> _submitPayment() async {
+    final amount = _amountController.text.trim();
+    final accNum = _accountNumberController.text.trim();
+
+    if (amount.isEmpty || accNum.isEmpty) {
+      _setMessage("Please fill in all fields.");
+      return;
+    }
+
+    setState(() => _isLoading = true);
+
+    try {
+     final response = await http.post(
+      Uri.parse('https://phpconfig.fun/atmapp/pay_bills.php'),
+      body: {
+        'user_id': widget.user.id.toString(),
+        'biller': widget.biller,
+        'amount': amount,
+        'account_number': accNum,
+      },
+    );
+      if (response.statusCode == 200) {
+        final jsonResponse = jsonDecode(response.body);
+        if (jsonResponse['success'] == true) {
+          print("Server response: ${response.body}");
+
+          _setMessage("You have successfully paid ₱$amount for ${widget.biller}", success: true);
+        } else {
+          _setMessage("Payment failed: ${jsonResponse['message']}");
+        }
+      } else {
+        _setMessage("Server error: ${response.statusCode}");
+      }
+    } catch (e) {
+      _setMessage("Error: ${e.toString()}");
+    }
+
+    setState(() => _isLoading = false);
+  }
+
+  void _setMessage(String message, {bool success = false}) {
+  setState(() {
+    _message = message;
+    _isSuccess = success;
+  });
+
+  if (success) {
+    Future.delayed(const Duration(seconds: 2), () {
+      Navigator.pop(context); // go back to biller list
+      Navigator.push(
+        context,
+        CupertinoPageRoute(
+          builder: (_) => ReceiptPage(
+            biller: widget.biller,
+            amount: _amountController.text,
+            accountNumber: _accountNumberController.text,
+             user: widget.user,
+          ),
+        ),
+      );
+    });
+  }
+}
 
   @override
   Widget build(BuildContext context) {
@@ -264,6 +335,7 @@ class _BillPaymentFormPageState extends State<BillPaymentFormPage> {
                 _isLoading
                     ? const Center(child: CupertinoActivityIndicator())
                     : GestureDetector(
+                        onTap: _submitPayment,
                         child: Container(
                           width: double.infinity,
                           padding: const EdgeInsets.symmetric(vertical: 16),
@@ -365,11 +437,13 @@ class ReceiptPage extends StatelessWidget {
   final String biller;
   final String amount;
   final String accountNumber;
+ final User user;
 
   const ReceiptPage({
     super.key,
     required this.biller,
     required this.amount,
+    required this.user,
     required this.accountNumber,
   });
 
@@ -429,7 +503,7 @@ class ReceiptPage extends StatelessWidget {
                       Navigator.push(
                         context,
                         CupertinoPageRoute(
-                          builder: (context) => DashboardScreen(), 
+                          builder: (context) => DashboardScreen(user: user), 
                         ),
                       );
                     },
