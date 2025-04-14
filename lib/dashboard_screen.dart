@@ -6,6 +6,7 @@ import 'transfer_screen.dart';
 import 'pay_bills_screen.dart';
 import 'cards_screen.dart';
 import 'settings_screen.dart';
+import 'user_model.dart';
 
 void main() {
   runApp(const BankingApp());
@@ -24,7 +25,9 @@ class BankingApp extends StatelessWidget {
 }
 
 class DashboardScreen extends StatefulWidget {
-  const DashboardScreen({super.key});
+   final User user;
+
+  const DashboardScreen({super.key, required this.user});
 
   @override
   State<DashboardScreen> createState() => _DashboardScreenState();
@@ -38,11 +41,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
   void initState() {
     super.initState();
     _pages = [
-      HomeScreen(onFeatureTap: _onItemTapped),
-      TransferPage(),
-      BillsPaymentPage(),
-      CardDetailsPage(),
-       SettingsPage(),
+      HomeScreen(user: widget.user, onFeatureTap: _onItemTapped),
+      TransferPage(user: widget.user), 
+      BillsPaymentPage(user: widget.user),
+      CardDetailsPage(user: widget.user),
+       SettingsPage(user: widget.user),
     ];
   }
   void _onItemTapped(int index) {

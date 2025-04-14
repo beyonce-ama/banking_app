@@ -1,9 +1,10 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
-
+import 'user_model.dart';
 
 class CardDetailsPage extends StatefulWidget {
-  const CardDetailsPage({super.key});
+  const CardDetailsPage({super.key, required this.user});
+     final User user;
 
   @override
   _CardDetailsPageState createState() => _CardDetailsPageState();
@@ -83,7 +84,7 @@ class _CardDetailsPageState extends State<CardDetailsPage> {
                           children: [
                             Text(
                               isCardNumberVisible
-                                  ? '3534535'
+                                  ? formatAccountNo(widget.user.accountNo)
                                   : '**** **** ****', // Masked until visible
                               style: const TextStyle(
                                 fontSize: 24,
@@ -116,7 +117,7 @@ class _CardDetailsPageState extends State<CardDetailsPage> {
                         ),
                         const SizedBox(height: 10),
                         Text(
-                          'Card Holder:',
+                          'Card Holder: ${widget.user.name}',
                           style: const TextStyle(
                             fontSize: 16,
                             color: Colors.white70,

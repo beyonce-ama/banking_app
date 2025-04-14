@@ -1,9 +1,13 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'dart:convert';
+import 'package:http/http.dart' as http;
+import 'user_model.dart';
 import 'login_screen.dart';
 
 class SettingsPage extends StatelessWidget {
-  const SettingsPage({super.key});
+  final User user;
+  const SettingsPage({super.key, required this.user});
 
 
 void logout(BuildContext context) {
@@ -62,7 +66,7 @@ void logout(BuildContext context) {
                         onTap: () {
                           Navigator.push(
                             context,
-                            CupertinoPageRoute(builder: (context) =>  ChangePinPage()),
+                            CupertinoPageRoute(builder: (context) =>  ChangePinPage(user: user)),
                           );
                         },
                       ),
@@ -153,17 +157,17 @@ void logout(BuildContext context) {
 }
 
 class ChangePinPage extends StatefulWidget {
-  const ChangePinPage({super.key});
+  final User user;
+  const ChangePinPage({super.key, required this.user});
 
   @override
   _ChangePinPageState createState() => _ChangePinPageState();
 }
 
 class _ChangePinPageState extends State<ChangePinPage> {
-  bool _isLoading = false;
+  final bool _isLoading = false;
   String? _message;
-  bool _isSuccess = false;
-
+  final bool _isSuccess = false;
 
  @override
 Widget build(BuildContext context) {
@@ -308,9 +312,9 @@ class VerifyOtpPage extends StatefulWidget {
 class _VerifyOtpPageState extends State<VerifyOtpPage> {
   final TextEditingController _otpController = TextEditingController();
   final TextEditingController _newPinController = TextEditingController();
-  bool _isLoading = false;
+  final bool _isLoading = false;
   String? _message;
-  bool _isSuccess = false;
+  final bool _isSuccess = false;
 bool _obscurePin = true;
 
 @override
@@ -492,7 +496,7 @@ Widget build(BuildContext context) {
 
                     const SizedBox(height: 30),
                     CupertinoButton.filled(
-                      onPressed: () {  },
+                      onPressed: _isLoading ? null : verifyOtpAndChangePin,
                       child: _isLoading
                           ? const CupertinoActivityIndicator()
                           : const Text('Change PIN'),

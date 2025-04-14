@@ -1,10 +1,14 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'dart:convert';
+import 'package:http/http.dart' as http;
+import 'user_model.dart';
 
 class HomeScreen extends StatefulWidget {
     final Function(int) onFeatureTap;
+    final User user;
 
-  const HomeScreen({super.key, required this.onFeatureTap});
+  const HomeScreen({super.key, required this.user, required this.onFeatureTap});
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -35,12 +39,86 @@ class _HomeScreenState extends State<HomeScreen> {
 
   bool _showBalance = true;
   bool _showCardNumber = true;
- final List<BankTransaction> _transactions = [];
-final bool _isLoadingTransactions = true;
+ List<BankTransaction> _transactions = [];
+bool _isLoadingTransactions = true;
 
 @override
 void initState() {
   super.initState();
+  fetchTransactions();
+  _currentBalance = widget.user.balance;
+   fetchBalance();
+}
+
+Future<void> fetchBalance() async {
+  try {
+    final response = await http.post(
+      Uri.parse('https://phpconfig.fun/atmapp/get_balance.php'),
+      body: {'accountId': widget.user.id.toString()},
+    );
+
+    print("Balance API response: ${response.body}");
+
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      if (data['status'] == 'success') {
+        final newBalance = double.tryParse(data['balance'].toString()) ?? 0.0;
+        print("Parsed balance: $newBalance");
+
+        setState(() {
+          _currentBalance = newBalance;
+        });
+      } else {
+        print("Balance fetch failed: ${data['message']}");
+      }
+    } else {
+      print("HTTP Error: ${response.statusCode}");
+    }
+  } catch (e) {
+    print("Exception in fetchBalance: $e");
+  }
+}
+
+Future<void> fetchTransactions() async {
+  try {
+    final response = await http.post(
+      Uri.parse('https://phpconfig.fun/atmapp/transaction.php'),
+      body: {
+        'accountId': widget.user.id.toString(), // Convert ID to string
+      },
+    );
+
+    if (response.statusCode == 200) {
+      final responseData = jsonDecode(response.body);
+      await fetchBalance();
+      if (responseData['status'].toString() == 'success') {
+        List<dynamic> data = responseData['data'];
+        setState(() {
+          _transactions = data.map((t) => BankTransaction.fromJson(t)).toList();
+          _isLoadingTransactions = false;
+        });
+       
+      } else {
+        setState(() {
+          _isLoadingTransactions = false;
+        });
+        // Handle the case when no transactions are found
+        print("Failed to fetch transactions: ${responseData['message']}");
+      }
+    } else {
+      setState(() {
+        _isLoadingTransactions = false;
+      });
+      // Handle non-200 response
+      print("Failed to load transactions. Status code: ${response.statusCode}");
+    }
+  } catch (error) {
+    setState(() {
+      _isLoadingTransactions = false;
+    });
+    // Handle network errors or other exceptions
+    print("Error occurred: $error");
+  }
 }
 
   @override
@@ -80,7 +158,7 @@ void initState() {
                         Icon(CupertinoIcons.person, color: Color(0xFF1565C0)),
                         SizedBox(width: 8),
                         Text(
-                          "Welcome,",
+                          "Welcome, ${widget.user.name}",
                           style: TextStyle(
                             fontSize: 22,
                             fontWeight: FontWeight.w600,
@@ -201,7 +279,8 @@ void initState() {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                           Text('',
+                           Text(
+                            widget.user.bankName,
                             style: TextStyle(
                               color: Colors.white,
                               fontSize: 40,
@@ -212,7 +291,7 @@ void initState() {
                             children: [
                               Text(
                                  _showCardNumber
-                                  ? "453534443"
+                                  ? formatAccountNo(widget.user.accountNo)
                                   : "**** **** ****",
                                 style: const TextStyle(
                                   color: Colors.white,

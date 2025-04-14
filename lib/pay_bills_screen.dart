@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'dashboard_screen.dart';
 
 class BillsPaymentPage extends StatelessWidget {
-  const BillsPaymentPage({super.key});
+  const BillsPaymentPage({super.key, });
 
   @override
   Widget build(BuildContext context) {
@@ -457,9 +457,3 @@ class ReceiptPage extends StatelessWidget {
     );
   }
 }
-
-  @override
-  Widget build(BuildContext context) {
-    // TODO: implement build
-    throw UnimplementedError();
-  }

@@ -1,13 +1,15 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'user_model.dart';
+import 'package:hive/hive.dart';
 
 
 class TransferPage extends StatelessWidget {
-  const TransferPage({super.key});
+  final User user;
+  const TransferPage({super.key, required this.user});
 
   @override
   Widget build(BuildContext context) {
-
     final List<String> partnerBanks = ["BDO", "Landbank", "PNB", "China Bank", "Union Bank", "BPI", "RCBC",];
 
     return CupertinoPageScaffold(
@@ -121,11 +123,13 @@ class TransferFormPage extends StatefulWidget {
   final String accountId;
   final String? initialName;
   final String? initialAccount;
-  
+  final User user;
+
   const TransferFormPage({
     super.key,
     required this.bankOrAccount,
     required this.accountId,
+    required this.user,
     this.initialName,
     this.initialAccount,
   });

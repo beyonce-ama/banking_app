@@ -1,5 +1,9 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'dashboard_screen.dart';
+import 'dart:convert';
+import 'package:http/http.dart' as http;
+import 'user_model.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -194,7 +198,71 @@ class _LoginScreenState extends State<LoginScreen> {
                           color: Colors.white,
                         ),
                       ),
-                      onPressed: ()  { },
+                      onPressed: () async {
+                        String username = _usernameController.text.trim();
+                        String pin = _passwordController.text.trim();
+
+                        // Validate inputs
+                        if (username.isEmpty || pin.isEmpty) {
+                          setState(() {
+                            _errorMessage = "Please fill in all fields."; // Set the error message
+                          });
+                          return;
+                        }
+
+                        try {
+                          var url = Uri.parse("https://phpconfig.fun/atmapp/login.php");
+                          var response = await http.post(
+                            url,
+                            headers: {"Content-Type": "application/json"},
+                            body: jsonEncode({"username": username, "pin": pin}),
+                          );
+
+                          print("Status Code: ${response.statusCode}");
+                          print("Response Body: ${response.body}");
+
+                          if (response.statusCode == 200) {
+                            var jsonResponse = jsonDecode(response.body);
+
+                              if (jsonResponse["status"] == "success") {
+                              // Show success message with green background
+                              setState(() {
+                                _successMessage = "Login Successful!";
+                                _errorMessage = null; // Clear any previous error message
+                              });
+                            User user = User.fromJson(jsonResponse["data"]);
+
+                              // Navigate to the dashboard screen after a short delay
+                              Future.delayed(const Duration(seconds: 1), () {
+                                Navigator.pushReplacement(
+                                  context,
+                                  CupertinoPageRoute(builder: (_) =>  DashboardScreen(user: user)),
+                                );
+                              });
+                            } else {
+                              // Show login failed message
+                              setState(() {
+                                _errorMessage = jsonResponse["message"]; // Show message from response
+                                _successMessage = null; // Clear success message
+                              });
+                            }
+                          } else {
+                            // Show error message if response status is not 200
+                            setState(() {
+                              _errorMessage = "Unexpected error occurred. Please try again."; // Error message
+                              _successMessage = null; // Clear success message
+                            });
+                          }
+                        } catch (e) {
+                          print("Login Error: $e");
+
+                          // Show connection error message
+                          setState(() {
+                            _errorMessage = "Could not connect to server. Please try again."; // Connection error
+                            _successMessage = null; // Clear success message
+                          });
+                        }
+                      },
                     ),
                   ),
 
