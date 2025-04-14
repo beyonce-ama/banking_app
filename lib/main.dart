@@ -1,5 +1,6 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'login_screen.dart';
 
 void main() {
   runApp(const BankingApp());
@@ -333,7 +334,12 @@ class WelcomeScreen extends StatelessWidget {
                           color: Colors.white,
                         ),
                       ),
-                      onPressed: () { },
+                      onPressed: () {
+                         Navigator.push(
+                          context,
+                          CupertinoPageRoute(builder: (_) => const LoginScreen()),
+                        );
+                      },
                     ),
                   ),
 
