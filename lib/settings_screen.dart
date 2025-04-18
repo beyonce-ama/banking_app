@@ -5,156 +5,285 @@ import 'package:http/http.dart' as http;
 import 'user_model.dart';
 import 'login_screen.dart';
 
-class SettingsPage extends StatelessWidget {
+class SettingsPage extends StatefulWidget {
   final User user;
   const SettingsPage({super.key, required this.user});
 
-
-void logout(BuildContext context) {
-  Navigator.of(context).pushAndRemoveUntil(
-    MaterialPageRoute(builder: (context) => LoginScreen()),
-    (Route<dynamic> route) => false,
-  );
+  @override
+  State<SettingsPage> createState() => _SettingsPageState();
 }
+
+class _SettingsPageState extends State<SettingsPage> with SingleTickerProviderStateMixin {
+  late AnimationController _animationController;
+  late Animation<double> _animation;
+
+  @override
+  void initState() {
+    super.initState();
+    _animationController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 20),
+    )..repeat();
+    _animation = Tween(begin: 0.0, end: 1.0).animate(_animationController);
+  }
+
+  @override
+  void dispose() {
+    _animationController.dispose();
+    super.dispose();
+  }
+
+  void logout(BuildContext context) {
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (context) => LoginScreen()),
+      (Route<dynamic> route) => false,
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     return CupertinoPageScaffold(
-      child: Container(
-        width: double.infinity,
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            colors: [
-              Color(0xFFE3F2FD),
-              Color(0xFFFFEBEE), 
-            ],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
+      child: Stack(
+        children: [
+          // Animated background
+          AnimatedBuilder(
+            animation: _animation,
+            builder: (context, child) {
+              return Container(
+                width: double.infinity,
+                height: double.infinity,
+                decoration: BoxDecoration(
+                  gradient: SweepGradient(
+                    center: FractionalOffset.center,
+                    startAngle: 0.0,
+                    endAngle: _animation.value * 6.28319, // 2*pi
+                    colors: const [
+                      Color(0xFFF0F7FF),
+                      Color(0xFFE1F0FF),
+                      Color(0xFFD6E9FF),
+                      Color(0xFFE1F0FF),
+                      Color(0xFFF0F7FF),
+                    ],
+                    stops: const [0.0, 0.3, 0.5, 0.7, 1.0],
+                  ),
+                ),
+              );
+            },
           ),
-        ),
-        child: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.all(20.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Settings',
-                  style: TextStyle(
-                    fontSize: 28,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF37474F),
-                  ),
-                ),
-                const SizedBox(height: 10),
-                const Text(
-                  'Manage your preferences',
-                  style: TextStyle(
-                    fontSize: 16,
-                    color: Color(0xFF7C8C8D),
-                  ),
-                ),
-                const SizedBox(height: 30),
 
-                Expanded(
-                  child: ListView(
+          // Floating bubbles
+          Positioned(
+            top: -50,
+            right: -30,
+            child: Container(
+              width: 200,
+              height: 200,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: const Color(0xFF3366FF).withOpacity(0.05),
+              ),
+            ),
+          ),
+          Positioned(
+            bottom: -100,
+            left: -50,
+            child: Container(
+              width: 300,
+              height: 300,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: const Color(0xFF3366FF).withOpacity(0.03),
+              ),
+            ),
+          ),
+          Positioned(
+            top: 150,
+            left: -20,
+            child: Container(
+              width: 150,
+              height: 150,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: const Color(0xFF3366FF).withOpacity(0.02),
+              ),
+            ),
+          ),
+
+          // Content
+          SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.all(20.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
                     children: [
-                      _buildSectionTitle('Account Settings'),
-                      _buildListTile(
-                        title: 'Change PIN',
-                        icon: CupertinoIcons.lock,
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            CupertinoPageRoute(builder: (context) =>  ChangePinPage(user: user)),
-                          );
-                        },
-                      ),
-
-                      // _buildListTile(
-                      //   title: 'Change Password',
-                      //   icon: CupertinoIcons.lock_circle,
-                      //   onTap: () {
-                      //     // Change Password functionality
-                      //   },
-                      // ),
-                      const Divider(),
-
-                      // // Section: Preferences
-                      // _buildSectionTitle('Preferences'),
-                      // _buildListTile(
-                      //   title: 'Notification Settings',
-                      //   icon: CupertinoIcons.bell,
-                      //   onTap: () {
-                      //     // Notification settings functionality
-                      //   },
-                      // ),
-                      // _buildListTile(
-                      //   title: 'Language',
-                      //   icon: CupertinoIcons.globe,
-                      //   onTap: () {
-                      //     // Language settings functionality
-                      //   },
-                      // ),
-                      // const Divider(),
-
-                      // Section: Logout
-                      _buildSectionTitle('Logout'),
-                      _buildListTile(
-                        title: 'Log Out',
-                        icon: CupertinoIcons.power,
-                        iconColor: Colors.red.shade700,
-                       onTap: () {
-                        logout(context);
-                      },
+                      Text(
+                        'Settings',
+                        style: const TextStyle(
+                          fontSize: 28,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF37474F),
+                        ),),
+                       Spacer(),
+                      CircleAvatar(
+                        backgroundColor: Colors.white.withOpacity( 0.3),
+                        child: const Icon(
+                          CupertinoIcons.person_fill,
+                          color: CupertinoColors.activeBlue,
+                        ),
                       ),
                     ],
                   ),
-                ),
-              ],
+                  const SizedBox(height: 10),
+                  Text(
+                    'Welcome, ${widget.user.name}',
+                    style: const TextStyle(
+                      fontSize: 16,
+                      color: Color(0xFF7C8C8D),
+                    ),
+                  ),
+                  const SizedBox(height: 30),
+
+                  Expanded(
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.7),
+                        borderRadius: BorderRadius.circular(20),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.1),
+                            blurRadius: 15,
+                            offset: const Offset(0, 5),
+                          ),
+                        ],
+                      ),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(20),
+                        child: ListView(
+                          padding: EdgeInsets.zero,
+                          children: [
+                            _buildSectionTitle('Account Settings'),
+                            _buildListTile(
+                              title: 'Change PIN',
+                              icon: CupertinoIcons.lock,
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  CupertinoPageRoute(
+                                    builder: (context) => ChangePinPage(user: widget.user)),
+                                );
+                              },
+                            ),
+                            const Divider(height: 1, indent: 20, endIndent: 20),
+
+                            _buildSectionTitle('Security'),
+                            _buildListTile(
+                              title: 'Privacy Policy',
+                              icon: CupertinoIcons.doc_text,
+                              onTap: () {
+                                // Privacy policy functionality
+                              },
+                            ),
+                            const Divider(height: 1, indent: 20, endIndent: 20),
+
+                            _buildSectionTitle('About'),
+                            _buildListTile(
+                              title: 'Help & Support',
+                              icon: CupertinoIcons.question_circle,
+                              onTap: () {
+                                // Help & support functionality
+                              },
+                            ),
+                            const Divider(height: 1, indent: 20, endIndent: 20),
+
+                            _buildSectionTitle('Session'),
+                            _buildListTile(
+                              title: 'Log Out',
+                              icon: CupertinoIcons.power,
+                              iconColor: Colors.red.shade700,
+                              onTap: () => logout(context),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
-        ),
+        ],
       ),
     );
   }
 
-  // Helper method to build section titles
   Widget _buildSectionTitle(String title) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 10),
+    return Container(
+      padding: const EdgeInsets.fromLTRB(20, 20, 20, 10),
       child: Text(
         title,
         style: const TextStyle(
-          fontSize: 20,
-          fontWeight: FontWeight.bold,
+          fontSize: 18,
+          fontWeight: FontWeight.w600,
           color: Color(0xFF37474F),
         ),
       ),
     );
   }
 
-  // Helper method to build individual ListTiles
   Widget _buildListTile({
     required String title,
     required IconData icon,
     Color? iconColor,
     required Function onTap,
   }) {
-    return CupertinoListTile(
-      leading: Icon(
-        icon,
-        color: iconColor ?? CupertinoColors.activeBlue,
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () => onTap(),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 20),
+          child: Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: (iconColor ?? CupertinoColors.activeBlue).withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(
+                  icon,
+                  color: iconColor ?? CupertinoColors.activeBlue,
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 15),
+              Expanded(
+                child: Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    color: Color(0xFF37474F),
+                  ),
+                ),
+              ),
+              Icon(
+                CupertinoIcons.chevron_right,
+                color: Colors.grey.shade400,
+                size: 18,
+              ),
+            ],
+          ),
+        ),
       ),
-      title: Text(title, style: TextStyle(
-          fontSize: 18,
-          color: Color(0xFF37474F),
-        ),),
-      trailing: const Icon(CupertinoIcons.chevron_forward),
-      onTap: () => onTap(),
     );
   }
 }
+
+// The ChangePinPage and VerifyOtpPage classes remain the same as in your original code
+// but would also need to be updated with similar background styling if desired
 
 class ChangePinPage extends StatefulWidget {
   final User user;
