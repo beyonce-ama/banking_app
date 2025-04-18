@@ -5,8 +5,8 @@ import 'package:http/http.dart' as http;
 import 'user_model.dart';
 
 class HomeScreen extends StatefulWidget {
-    final Function(int) onFeatureTap;
-    final User user;
+  final Function(int) onFeatureTap;
+  final User user;
 
   const HomeScreen({super.key, required this.user, required this.onFeatureTap});
 
@@ -15,185 +15,239 @@ class HomeScreen extends StatefulWidget {
 }
 
 class BankTransaction {
-  final String type; 
+  final String type;
   final double amount;
   final String date;
 
   BankTransaction({
-    required this.type, // 'title' is now 'type'
+    required this.type,
     required this.amount,
     required this.date,
   });
 
   factory BankTransaction.fromJson(Map<String, dynamic> json) {
     return BankTransaction(
-      type: json['Type'], // 'title' is now 'Type'
-      amount: double.tryParse(json['Amount'].toString()) ?? 0.0, // Amount field
-      date: json['Date'], // Date field
+      type: json['Type'],
+      amount: double.tryParse(json['Amount'].toString()) ?? 0.0,
+      date: json['Date'],
     );
   }
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateMixin {
   late double _currentBalance;
-
   bool _showBalance = true;
   bool _showCardNumber = true;
- List<BankTransaction> _transactions = [];
-bool _isLoadingTransactions = true;
+  List<BankTransaction> _transactions = [];
+  bool _isLoadingTransactions = true;
+  late AnimationController _controller;
+  late Animation<double> _animation;
 
-@override
-void initState() {
-  super.initState();
-  fetchTransactions();
-  _currentBalance = widget.user.balance;
-   fetchBalance();
-}
-
-Future<void> fetchBalance() async {
-  try {
-    final response = await http.post(
-      Uri.parse('https://phpconfig.fun/atmapp/get_balance.php'),
-      body: {'accountId': widget.user.id.toString()},
-    );
-
-    print("Balance API response: ${response.body}");
-
-    if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
-      if (data['status'] == 'success') {
-        final newBalance = double.tryParse(data['balance'].toString()) ?? 0.0;
-        print("Parsed balance: $newBalance");
-
-        setState(() {
-          _currentBalance = newBalance;
-        });
-      } else {
-        print("Balance fetch failed: ${data['message']}");
-      }
-    } else {
-      print("HTTP Error: ${response.statusCode}");
-    }
-  } catch (e) {
-    print("Exception in fetchBalance: $e");
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 20),
+    )..repeat();
+    _animation = Tween<double>(begin: 0, end: 1).animate(_controller);
+    fetchTransactions();
+    _currentBalance = widget.user.balance;
+    fetchBalance();
   }
-}
 
-Future<void> fetchTransactions() async {
-  try {
-    final response = await http.post(
-      Uri.parse('https://phpconfig.fun/atmapp/transaction.php'),
-      body: {
-        'accountId': widget.user.id.toString(), // Convert ID to string
-      },
-    );
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
 
-    if (response.statusCode == 200) {
-      final responseData = jsonDecode(response.body);
-      await fetchBalance();
-      if (responseData['status'].toString() == 'success') {
-        List<dynamic> data = responseData['data'];
-        setState(() {
-          _transactions = data.map((t) => BankTransaction.fromJson(t)).toList();
-          _isLoadingTransactions = false;
-        });
-       
+  Future<void> fetchBalance() async {
+    try {
+      final response = await http.post(
+        Uri.parse('https://phpconfig.fun/atmapp/get_balance.php'),
+        body: {'accountId': widget.user.id.toString()},
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (data['status'] == 'success') {
+          final newBalance = double.tryParse(data['balance'].toString()) ?? 0.0;
+          setState(() {
+            _currentBalance = newBalance;
+          });
+        }
+      }
+    } catch (e) {
+      print("Exception in fetchBalance: $e");
+    }
+  }
+
+  Future<void> fetchTransactions() async {
+    try {
+      final response = await http.post(
+        Uri.parse('https://phpconfig.fun/atmapp/transaction.php'),
+        body: {'accountId': widget.user.id.toString()},
+      );
+
+      if (response.statusCode == 200) {
+        final responseData = jsonDecode(response.body);
+        await fetchBalance();
+        if (responseData['status'].toString() == 'success') {
+          List<dynamic> data = responseData['data'];
+          setState(() {
+            _transactions = data.map((t) => BankTransaction.fromJson(t)).toList();
+            _isLoadingTransactions = false;
+          });
+        } else {
+          setState(() {
+            _isLoadingTransactions = false;
+          });
+        }
       } else {
         setState(() {
           _isLoadingTransactions = false;
         });
-        // Handle the case when no transactions are found
-        print("Failed to fetch transactions: ${responseData['message']}");
       }
-    } else {
+    } catch (error) {
       setState(() {
         _isLoadingTransactions = false;
       });
-      // Handle non-200 response
-      print("Failed to load transactions. Status code: ${response.statusCode}");
     }
-  } catch (error) {
-    setState(() {
-      _isLoadingTransactions = false;
-    });
-    // Handle network errors or other exceptions
-    print("Error occurred: $error");
   }
-}
 
   @override
   Widget build(BuildContext context) {
-    double screenWidth = MediaQuery.of(context).size.width;
-    double padding = screenWidth * 0.07;
+    final size = MediaQuery.of(context).size;
+    final isSmallScreen = size.width < 400;
+    final padding = isSmallScreen ? 24.0 : 40.0;
 
     String formatAccountNo(String accountNo) {
       return accountNo.replaceAllMapped(RegExp(r".{1,4}"), (match) => "${match.group(0)} ").trim();
     }
 
-    return SingleChildScrollView(
-      child: CupertinoPageScaffold(
-        child: Container(
-          width: double.infinity,
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              colors: [
-                Color(0xFFE3F2FD), // Light Blue
-                Color(0xFFFFEBEE), // Light Pink
-              ],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
+    return CupertinoPageScaffold(
+      child: Stack(
+        children: [
+          // Animated background matching welcome screen
+          AnimatedBuilder(
+            animation: _animation,
+            builder: (context, child) {
+              return Container(
+                decoration: BoxDecoration(
+                  gradient: SweepGradient(
+                    center: FractionalOffset.center,
+                    startAngle: 0.0,
+                    endAngle: _animation.value * 6.28319,
+                    colors: const [
+                      Color(0xFFF0F7FF),
+                      Color(0xFFE1F0FF),
+                      Color(0xFFD6E9FF),
+                      Color(0xFFE1F0FF),
+                      Color(0xFFF0F7FF),
+                    ],
+                    stops: const [0.0, 0.3, 0.5, 0.7, 1.0],
+                  ),
+                ),
+              );
+            },
           ),
-          child: SafeArea(
+          
+          // Floating bubbles
+          Positioned(
+            top: -50,
+            right: -30,
+            child: Container(
+              width: 200,
+              height: 200,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: const Color(0xFF3366FF).withOpacity(0.05),
+              ),
+            ),),
+          Positioned(
+            bottom: -100,
+            left: -50,
+            child: Container(
+              width: 300,
+              height: 300,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: const Color(0xFF3366FF).withOpacity(0.03),
+              ),
+            ), ),
+          
+          // Content
+          SafeArea(
             child: SingleChildScrollView(
               child: Padding(
                 padding: EdgeInsets.symmetric(horizontal: padding),
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const SizedBox(height: 30),
+                    
+                    // App header with welcome message
                     Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children:  [
-                        Icon(CupertinoIcons.person, color: Color(0xFF1565C0)),
-                        SizedBox(width: 8),
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.9),
+                            shape: BoxShape.circle,
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.05),
+                                blurRadius: 10,
+                              ),
+                            ],
+                          ),
+                          child: Icon(
+                            CupertinoIcons.person_fill,
+                            color: const Color(0xFF3366FF),
+                            size: 24,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
                         Text(
                           "Welcome, ${widget.user.name}",
                           style: TextStyle(
-                            fontSize: 22,
-                            fontWeight: FontWeight.w600,
-                            color: Color(0xFF1565C0),
+                            fontSize: isSmallScreen ? 20 : 24,
+                            fontWeight: FontWeight.w700,
+                            color: const Color(0xFF1A237E),
                           ),
                         ),
                       ],
                     ),
+                    
                     const SizedBox(height: 30),
-      
-                    // Account Balance
+                    
+                    // Balance card
                     Container(
                       width: double.infinity,
                       padding: const EdgeInsets.all(20),
                       decoration: BoxDecoration(
-                        color: Colors.white,
+                        color: Colors.white.withOpacity(0.95),
                         borderRadius: BorderRadius.circular(16),
-                        boxShadow: const [
+                        boxShadow: [
                           BoxShadow(
-                            color: Colors.black12,
-                            blurRadius: 10,
-                            offset: Offset(0, 3),
+                            color: Colors.black.withOpacity(0.05),
+                            blurRadius: 20,
+                            spreadRadius: 5,
                           ),
                         ],
                       ),
                       child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Row(
                             children: [
-                              const Text(
+                              Text(
                                 "Account Balance",
                                 style: TextStyle(
                                   fontSize: 16,
                                   fontWeight: FontWeight.w600,
-                                  color: Color(0xFF1565C0),
+                                  color: const Color(0xFF546E7A),
                                 ),
                               ),
                               const Spacer(),
@@ -207,92 +261,99 @@ Future<void> fetchTransactions() async {
                                   _showBalance
                                       ? CupertinoIcons.eye_fill
                                       : CupertinoIcons.eye_slash_fill,
-                                  color: Color(0xFF1565C0),
+                                  color: const Color(0xFF3366FF),
+                                  size: 20,
                                 ),
                               ),
                             ],
                           ),
-                          const SizedBox(height: 10),
+                          const SizedBox(height: 12),
                           Text(
                             _showBalance
-                              ? _currentBalance.toStringAsFixed(2)
-                              : "••••••",
-                            style: const TextStyle(
-                              fontSize: 28,
-                              fontWeight: FontWeight.bold,
-                              color: Color(0xFF1E88E5),
+                                ? "₱${_currentBalance.toStringAsFixed(2)}"
+                                : "••••••",
+                            style: TextStyle(
+                              fontSize: isSmallScreen ? 28 : 32,
+                              fontWeight: FontWeight.w800,
+                              color: const Color(0xFF1A237E),
                             ),
                           ),
                         ],
                       ),
                     ),
-      
+                    
                     const SizedBox(height: 30),
-      
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    children: [
-                      FeatureCard(
-                        icon: CupertinoIcons.arrow_up_arrow_down,
-                        label: "Transfers",
-                        onTap: () => widget.onFeatureTap.call(1),
-                      ),
-                      FeatureCard(
-                        icon: CupertinoIcons.money_dollar,
-                        label: "Pay Bills",
-                        onTap: () =>widget.onFeatureTap.call(2),
-                      ),
-                      FeatureCard(
-                        icon: CupertinoIcons.creditcard,
-                        label: "Cards",
-                        onTap: () => widget.onFeatureTap.call(3),
-                      ),
-                      FeatureCard(
-                        icon: CupertinoIcons.device_phone_portrait,
-                        label: "Buy Load",
-                        onTap: () {},
-                      ),
-                    ],
-                  ),
+                    
+                    // Quick actions grid
+                    GridView.count(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      crossAxisCount: 4,
+                      childAspectRatio: 0.8,
+                      children: [
+                        FeatureCard(
+                          icon: CupertinoIcons.arrow_up_arrow_down,
+                          label: "Transfers",
+                          onTap: () => widget.onFeatureTap.call(1),
+                        ),
+                        FeatureCard(
+                          icon: CupertinoIcons.money_dollar,
+                          label: "Pay Bills",
+                          onTap: () => widget.onFeatureTap.call(2),
+                        ),
+                        FeatureCard(
+                          icon: CupertinoIcons.creditcard,
+                          label: "Cards",
+                          onTap: () => widget.onFeatureTap.call(3),
+                        ),
+                        FeatureCard(
+                          icon: CupertinoIcons.device_phone_portrait,
+                          label: "Buy Load",
+                          onTap: () {},
+                        ),
+                      ],
+                    ),
+                    
                     const SizedBox(height: 30),
-      
-                    // Card Design Section
+                    
+                    // Bank card design
                     Container(
                       width: double.infinity,
                       height: 180,
                       padding: const EdgeInsets.all(20),
                       decoration: BoxDecoration(
                         gradient: const LinearGradient(
-                          colors: [Color(0xFF42A5F5), Color(0xFF1565C0)],
+                          colors: [Color(0xFF3366FF), Color(0xFF1A237E)],
                           begin: Alignment.topLeft,
                           end: Alignment.bottomRight,
                         ),
-                        borderRadius: BorderRadius.circular(20),
-                        boxShadow: const [
+                        borderRadius: BorderRadius.circular(16),
+                        boxShadow: [
                           BoxShadow(
-                            color: Colors.black26,
-                            blurRadius: 12,
-                            offset: Offset(0, 4),
+                            color: const Color(0xFF3366FF).withOpacity(0.3),
+                            blurRadius: 15,
+                            offset: const Offset(0, 5),
                           ),
                         ],
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                           Text(
+                          Text(
                             widget.user.bankName,
-                            style: TextStyle(
+                            style: const TextStyle(
                               color: Colors.white,
-                              fontSize: 40,
+                              fontSize: 24,
+                              fontWeight: FontWeight.w700,
                             ),
                           ),
                           const Spacer(),
                           Row(
                             children: [
                               Text(
-                                 _showCardNumber
-                                  ? formatAccountNo(widget.user.accountNo)
-                                  : "**** **** ****",
+                                _showCardNumber
+                                    ? formatAccountNo(widget.user.accountNo)
+                                    : "•••• •••• ••••",
                                 style: const TextStyle(
                                   color: Colors.white,
                                   fontSize: 18,
@@ -307,76 +368,93 @@ Future<void> fetchTransactions() async {
                                   });
                                 },
                                 child: const Icon(
-                                  CupertinoIcons.eye,
+                                  CupertinoIcons.eye_fill,
                                   color: Colors.white,
+                                  size: 20,
                                 ),
                               ),
                             ],
                           ),
-                          const SizedBox(height: 10),
+                          const SizedBox(height: 8),
                           const Text(
                             "Exp: 12/24",
-                            style: TextStyle(color: Colors.white),
+                            style: TextStyle(
+                              color: Colors.white70,
+                              fontSize: 14,
+                            ),
                           ),
                         ],
                       ),
                     ),
-      
+                    
                     const SizedBox(height: 30),
-      
-                    // Transaction Tile (for loop use later)
+                    
+                    // Transactions section
                     Container(
                       width: double.infinity,
                       padding: const EdgeInsets.all(20),
                       decoration: BoxDecoration(
-                        color: Colors.white,
+                        color: Colors.white.withOpacity(0.95),
                         borderRadius: BorderRadius.circular(16),
-                        boxShadow: const [
+                        boxShadow: [
                           BoxShadow(
-                            color: Colors.black12,
-                            blurRadius: 10,
-                            offset: Offset(0, 3),
+                            color: Colors.black.withOpacity(0.05),
+                            blurRadius: 20,
+                            spreadRadius: 5,
                           ),
                         ],
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text(
+                          Text(
                             "Recent Transactions",
                             style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
-                              color: Color(0xFF1565C0),
+                              fontSize: 18,
+                              fontWeight: FontWeight.w700,
+                              color: const Color(0xFF1A237E),
                             ),
                           ),
                           const SizedBox(height: 16),
                           if (_isLoadingTransactions)
-                            const Center(child: CupertinoActivityIndicator())
+                            const Center(
+                              child: CupertinoActivityIndicator(
+                                radius: 14,
+                                color: Color(0xFF3366FF),
+                              ),
+                            )
                           else if (_transactions.isEmpty)
-                            const Text("No transactions found.")
+                            Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 20),
+                              child: Center(
+                                child: Text(
+                                  "No transactions found",
+                                  style: TextStyle(
+                                    color: const Color(0xFF546E7A),
+                                  ),
+                                ),
+                              ),
+                            )
                           else
-                           ..._transactions.map((tx) => Padding(
-                            padding: const EdgeInsets.only(bottom: 10),
-                            child: TransactionTile(
-                              type: tx.type, 
-                              amount: tx.amount, 
-                              date: tx.date,
-                            ),
-                          )),
-
+                            ..._transactions.map((tx) => Padding(
+                              padding: const EdgeInsets.only(bottom: 16),
+                              child: TransactionTile(
+                                type: tx.type,
+                                amount: tx.amount,
+                                date: tx.date,
+                              ),
+                            )),
                         ],
                       ),
                     ),
-                    const SizedBox(height: 30),
-      
-                    const SizedBox(height: 60),
+                    
+                    const SizedBox(height: 40),
                   ],
                 ),
               ),
             ),
           ),
-        ),
+        ],
       ),
     );
   }
@@ -396,41 +474,52 @@ class FeatureCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.all(2.0),
-      child: GestureDetector(
-        onTap: onTap,
-        child: Container(
-          width: 80,
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            boxShadow: const [
-              BoxShadow(
-                color: Colors.black12,
-                blurRadius: 8,
-                offset: Offset(0, 3),
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        margin: const EdgeInsets.all(4),
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.95),
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 10,
+            ),
+          ],
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 50,
+              height: 50,
+              decoration: BoxDecoration(
+                color: const Color(0xFF3366FF).withOpacity(0.1),
+                shape: BoxShape.circle,
               ),
-            ],
-          ),
-          child: Column(
-            children: [
-              Icon(icon, size: 26, color: Color(0xFF1E88E5)),
-              const SizedBox(height: 6),
-              Text(
-                label,
-                style: const TextStyle(fontSize: 11, color: Color(0xFF37474F)),
-                textAlign: TextAlign.center,
+              child: Icon(
+                icon,
+                size: 24,
+                color: const Color(0xFF3366FF),
               ),
-            ],
-          ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              label,
+              style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF37474F),
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
         ),
       ),
     );
   }
 }
-
 
 class TransactionTile extends StatelessWidget {
   final String type;
@@ -443,50 +532,59 @@ class TransactionTile extends StatelessWidget {
     required this.amount,
     required this.date,
   });
-@override
-Widget build(BuildContext context) {
 
-  final isIncome = type.toLowerCase().contains("deposit") || 
-                   type.toLowerCase().contains("from");
+  @override
+  Widget build(BuildContext context) {
+    final isIncome = type.toLowerCase().contains("deposit") || 
+                     type.toLowerCase().contains("from");
 
-  String formattedAmount = 
-      "${isIncome ? "+" : "-"} ₱${amount.toStringAsFixed(2)}";
+    String formattedAmount = "${isIncome ? "+" : "-"} ₱${amount.toStringAsFixed(2)}";
 
-  return Row(
-    children: [
-      const Icon(CupertinoIcons.time, size: 22, color: Color(0xFF1E88E5)),
-      const SizedBox(width: 12),
-      Expanded(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              type,
-              style: const TextStyle(
-                fontWeight: FontWeight.w600,
-                fontSize: 14,
-              ),
-            ),
-            Text(
-              date,
-              style: const TextStyle(
-                fontSize: 12,
-                color: Colors.grey,
-              ),
-            ),
-          ],
+    return Row(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: const Color(0xFF3366FF).withOpacity(0.1),
+            shape: BoxShape.circle,
+          ),
+          child: Icon(
+            isIncome ? CupertinoIcons.arrow_down : CupertinoIcons.arrow_up,
+            size: 18,
+            color: const Color(0xFF3366FF),
+          ),
         ),
-      ),
-      Text(
-        formattedAmount,
-        style: TextStyle(
-          fontWeight: FontWeight.bold,
-          fontSize: 14,
-          color: isIncome ? Colors.green[800] : Colors.red[700],
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                type,
+                style: const TextStyle(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 14,
+                ),
+              ),
+              Text(
+                date,
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: Color(0xFF90A4AE),
+                ),
+              ),
+            ],
+          ),
         ),
-      ),
-    ],
-  );
-}
-
+        Text(
+          formattedAmount,
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            fontSize: 14,
+            color: isIncome ? Colors.green[800] : Colors.red[700],
+          ),
+        ),
+      ],
+    );
+  }
 }
